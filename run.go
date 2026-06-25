@@ -84,12 +84,10 @@ func fileFormat(name, body string) string {
 
 // locate finds the symbol with the given ID and the file path that holds it.
 func locate(p *core.Project, id string) (core.Symbol, string, bool) {
-	for _, f := range p.Files {
-		for _, s := range f.Symbols {
-			if s.ID == id {
-				return s, f.Path, true
-			}
-		}
+	f, ok := p.SymbolFile(id)
+	if !ok {
+		return core.Symbol{}, "", false
 	}
-	return core.Symbol{}, "", false
+	s, _ := f.SymbolByID(id)
+	return s, f.Path, true
 }
