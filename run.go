@@ -29,6 +29,13 @@ type Result struct {
 
 // Run executes a recipe deterministically around one model call: gather the gated
 // packet (context) → propose (model) → apply the action (return / file / splice).
+//
+// CONTRACT — stale-span safety: p must reflect the current on-disk state of every
+// file in the project. For EditCode recipes, Run locates the symbol's byte span in
+// p and splices directly into the file at those offsets. If any file has been edited
+// on disk since p was parsed, the spans are stale and the splice will corrupt it.
+// Callers are responsible for re-parsing (core.ParseDir) when files may have changed
+// before calling Run with an EditCode recipe.
 func Run(r Recipe, p *core.Project, st store.Store, m Model) (*Result, error) {
 	pk, err := gctx.Build(p, r.Focus, r.Gate)
 	if err != nil {
