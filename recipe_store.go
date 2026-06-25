@@ -23,28 +23,31 @@ func Save(st store.Store, r Recipe) error {
 	})
 }
 
-// Load reads a recipe back by name. Adding a recipe is adding a record; there is no
-// code path — Save/Load round-trips the same data Run consumes.
-func Load(st store.Store, name string) (Recipe, bool) {
+// Load reads a recipe back by name. Returns (zero, false, nil) when not found and
+// (zero, false, err) when the record exists but cannot be unmarshalled — callers
+// can distinguish corruption from absence via the error.
+func Load(st store.Store, name string) (Recipe, bool, error) {
 	rec, ok := st.Get("recipe/" + name)
 	if !ok {
-		return Recipe{}, false
+		return Recipe{}, false, nil
 	}
 	var r Recipe
 	if err := json.Unmarshal([]byte(rec.Body), &r); err != nil {
-		return Recipe{}, false
+		return Recipe{}, false, fmt.Errorf("workflow: unmarshal recipe %q: %w", name, err)
 	}
-	return r, true
+	return r, true, nil
 }
 
-// List returns every saved recipe.
-func List(st store.Store) []Recipe {
+// List returns every saved recipe. It returns an error on the first corrupt record
+// so callers are not silently handed a truncated list.
+func List(st store.Store) ([]Recipe, error) {
 	var out []Recipe
 	for _, rec := range st.List(store.OfKind(store.KRecipe)) {
 		var r Recipe
-		if err := json.Unmarshal([]byte(rec.Body), &r); err == nil {
-			out = append(out, r)
+		if err := json.Unmarshal([]byte(rec.Body), &r); err != nil {
+			return out, fmt.Errorf("workflow: unmarshal recipe %q: %w", rec.Key, err)
 		}
+		out = append(out, r)
 	}
-	return out
+	return out, nil
 }

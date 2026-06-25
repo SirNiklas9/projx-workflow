@@ -129,7 +129,10 @@ func TestRecipeSaveLoadRoundTrip(t *testing.T) {
 	if err := Save(st, r); err != nil {
 		t.Fatal(err)
 	}
-	got, ok := Load(st, "commit")
+	got, ok, err := Load(st, "commit")
+	if err != nil {
+		t.Fatalf("Load returned unexpected error: %v", err)
+	}
 	if !ok {
 		t.Fatal("recipe should load back")
 	}
@@ -139,7 +142,11 @@ func TestRecipeSaveLoadRoundTrip(t *testing.T) {
 	if len(got.Gate.Deny) != 1 || got.Gate.Deny[0] != "secret/" {
 		t.Fatalf("gate dials lost in round-trip: %+v", got.Gate)
 	}
-	if all := List(st); len(all) != 1 {
+	all, err := List(st)
+	if err != nil {
+		t.Fatalf("List returned unexpected error: %v", err)
+	}
+	if len(all) != 1 {
 		t.Fatalf("List should see 1 recipe, got %d", len(all))
 	}
 }
