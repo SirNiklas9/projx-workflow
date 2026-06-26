@@ -123,6 +123,31 @@ func TestRunEditCodeSplices(t *testing.T) {
 	}
 }
 
+// TestRunCommitAccumulatesHistory verifies that running the same FileRecord recipe
+// twice produces two distinct records rather than silently overwriting the first.
+func TestRunCommitAccumulatesHistory(t *testing.T) {
+	p := project(t)
+	st := store.NewMem()
+	r := NewCommit("commit", "summarize the change", gctx.Gate{})
+
+	res1, err := Run(r, p, st, &fakeModel{reply: "first run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res2, err := Run(r, p, st, &fakeModel{reply: "second run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res1.Filed == res2.Filed {
+		t.Fatalf("two runs should produce distinct record IDs, both got %q", res1.Filed)
+	}
+	_, ok1 := st.Get(res1.Filed)
+	_, ok2 := st.Get(res2.Filed)
+	if !ok1 || !ok2 {
+		t.Fatalf("both records must survive: first=%v second=%v", ok1, ok2)
+	}
+}
+
 func TestRecipeSaveLoadRoundTrip(t *testing.T) {
 	st := store.NewMem()
 	r := NewCommit("commit", "summarize", gctx.Gate{Deny: []string{"secret/"}})

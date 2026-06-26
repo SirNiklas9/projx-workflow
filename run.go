@@ -3,12 +3,34 @@ package workflow
 import (
 	"fmt"
 	"path/filepath"
+	"sync"
+	"time"
 
 	gctx "github.com/SirNiklas9/projx-context"
 	core "github.com/SirNiklas9/projx-core"
 	generation "github.com/SirNiklas9/projx-generation"
 	store "github.com/SirNiklas9/projx-store"
 )
+
+// fileStamp returns a unix-millisecond timestamp that is strictly increasing
+// within this process — same guarantee the store uses for UpdatedAt. Two rapid
+// FileRecord runs in the same millisecond get consecutive values so their IDs
+// never collide.
+var (
+	fileStampMu   sync.Mutex
+	fileStampLast int64
+)
+
+func fileStamp() int64 {
+	fileStampMu.Lock()
+	defer fileStampMu.Unlock()
+	t := time.Now().UnixMilli()
+	if t <= fileStampLast {
+		t = fileStampLast + 1
+	}
+	fileStampLast = t
+	return t
+}
 
 // Model is the ONLY non-deterministic step in a run: given the prepared prompt and
 // the gated packet, it produces a proposal. It is injected so the AI lives in
@@ -53,7 +75,7 @@ func Run(r Recipe, p *core.Project, st store.Store, m Model) (*Result, error) {
 
 	case FileRecord:
 		rec := store.Record{
-			ID:    r.RecordScope.String() + "/" + r.RecordKind.String() + "/" + r.Name,
+			ID:    fmt.Sprintf("%s/%s/%s/%d", r.RecordScope.String(), r.RecordKind.String(), r.Name, fileStamp()),
 			Kind:  r.RecordKind,
 			Scope: r.RecordScope,
 			Key:   r.Name,
